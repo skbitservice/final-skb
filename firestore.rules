@@ -1,0 +1,161 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared global functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.matches("(?i)^skbitservice@gmail\\.com$") ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches("^[a-zA-Z0-9_\\-]+$");
+    }
+
+    // Validation Blueprint helpers
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+             data.mobile is string && data.mobile.size() <= 20 &&
+             data.address is string && data.address.size() <= 500 &&
+             data.role is string && (data.role == "customer" || data.role == "admin") &&
+             data.status is string && (data.status == "Active" || data.status == "Blocked");
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number && data.stock >= 0 &&
+             data.description is string && data.description.size() <= 2000;
+    }
+
+    function isValidTicket(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 100 &&
+             data.customerEmail is string && data.customerEmail.size() > 0 && data.customerEmail.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 2000 &&
+             data.status is string && (data.status == "Open" || data.status == "Pending" || data.status == "Resolved" || data.status == "Closed") &&
+             data.priority is string && (data.priority == "Normal" || data.priority == "High" || data.priority == "Urgent");
+    }
+
+    function isValidOrder(data) {
+      return data.id is string && data.id.size() <= 64 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 100 &&
+             data.customerPhone is string && data.customerPhone.size() <= 20 &&
+             data.customerEmail is string && data.customerEmail.size() > 0 && data.customerEmail.size() <= 100 &&
+             data.address is string && data.address.size() > 0 && data.address.size() <= 500 &&
+             data.city is string && data.city.size() > 0 && data.city.size() <= 100 &&
+             data.state is string && data.state.size() > 0 && data.state.size() <= 100 &&
+             data.zip is string && data.zip.size() > 0 && data.zip.size() <= 20 &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 100 &&
+             data.subtotal is number && data.subtotal >= 0 &&
+             data.shipping is number && data.shipping >= 0 &&
+             data.total is number && data.total >= 0 &&
+             data.status is string && (data.status == "Pending" || data.status == "Confirmed" || data.status == "Packed" || data.status == "Shipped" || data.status == "Delivered" || data.status == "Cancelled");
+    }
+
+    function isValidContact(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+             data.mobile is string && data.mobile.size() <= 20 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 1000 &&
+             data.responded is bool;
+    }
+
+    function isValidEmailLog(data) {
+      return data.recipient is string && data.recipient.size() > 0 &&
+             data.subject is string && data.subject.size() > 0 &&
+             data.content is string && data.content.size() > 0;
+    }
+
+    function isValidBrand(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.createdAt is string && data.createdAt.size() > 0;
+    }
+
+    // MATCH COLL: USERS
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // MATCH COLL: PRODUCTS
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidProduct(incoming());
+      allow update: if isValidProduct(incoming()) && (
+        isAdmin() || 
+        (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['stock']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // MATCH COLL: TICKETS
+    match /tickets/{ticketId} {
+      allow read: if true;
+      allow create: if isValidTicket(incoming());
+      allow update: if (isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.customerEmail == request.auth.token.email))) && isValidTicket(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // MATCH COLL: ORDERS
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == request.auth.token.email || resource.data.customerEmail == request.auth.token.email));
+      allow create: if isSignedIn() && isValidOrder(incoming());
+      allow update: if (isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == request.auth.token.email || resource.data.customerEmail == request.auth.token.email))) && isValidOrder(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // MATCH COLL: CONTACTS
+    match /contacts/{contactId} {
+      allow read: if isAdmin();
+      allow create: if isValidContact(request.resource.data);
+      allow update: if isAdmin() && isValidContact(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // MATCH COLL: EMAIL LOGS
+    match /email_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isValidEmailLog(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // MATCH COLL: BRANDS
+    match /brands/{brandId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidBrand(request.resource.data);
+      allow update: if isAdmin() && isValidBrand(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

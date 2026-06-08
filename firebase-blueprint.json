@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and privileges information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique user identifier from Auth" },
+        "name": { "type": "string", "description": "Full name of the user" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "mobile": { "type": "string", "description": "Mobile number" },
+        "address": { "type": "string", "description": "Shipping address" },
+        "role": { "type": "string", "enum": ["customer", "admin"], "description": "Account role" },
+        "status": { "type": "string", "enum": ["Active", "Blocked"], "description": "Account status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Profile sign up timestamp" }
+      },
+      "required": ["name", "email", "role", "status"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Inventory product item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique product ID" },
+        "name": { "type": "string", "description": "Product name" },
+        "category": { "type": "string", "description": "Product category" },
+        "price": { "type": "number", "description": "Price in INR" },
+        "stock": { "type": "number", "description": "Stock count" },
+        "description": { "type": "string", "description": "Product description" },
+        "image": { "type": "string", "description": "Base64 image data or URL" }
+      },
+      "required": ["name", "category", "price", "stock"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Customer support ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ticket identifier" },
+        "customerName": { "type": "string", "description": "Customer contact name" },
+        "customerEmail": { "type": "string", "format": "email", "description": "Customer email" },
+        "phone": { "type": "string", "description": "Customer mobile number" },
+        "subject": { "type": "string", "description": "Ticket subject heading" },
+        "message": { "type": "string", "description": "Details of the issue" },
+        "status": { "type": "string", "enum": ["Open", "Pending", "Resolved", "Closed"], "description": "Current status" },
+        "priority": { "type": "string", "enum": ["Normal", "High", "Urgent"], "description": "Service priority level" },
+        "reply": { "type": "string", "description": "Support team administrator response" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Time Raised" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Time Modified" }
+      },
+      "required": ["id", "customerName", "customerEmail", "phone", "subject", "message", "status", "priority"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Product purchase order and shipping details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique order identifier" },
+        "userId": { "type": "string", "description": "Associated user account ID" },
+        "customerName": { "type": "string", "description": "Delivery contact name" },
+        "customerPhone": { "type": "string", "description": "Delivery phone number" },
+        "customerEmail": { "type": "string", "format": "email", "description": "Delivery notification email" },
+        "address": { "type": "string", "description": "Delivery street address" },
+        "city": { "type": "string", "description": "Delivery city" },
+        "state": { "type": "string", "description": "Delivery state" },
+        "zip": { "type": "string", "description": "Delivery postal zip code" },
+        "items": { "type": "array", "description": "Ordered products list" },
+        "subtotal": { "type": "number", "description": "Cost of parts in INR" },
+        "shipping": { "type": "number", "description": "Shipping charges in INR" },
+        "total": { "type": "number", "description": "Grand total in INR" },
+        "shippingMethod": { "type": "string", "enum": ["standard", "express"] },
+        "paymentMethod": { "type": "string", "enum": ["cod", "online"] },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Packed", "Shipped", "Delivered", "Cancelled"] },
+        "trackingNumber": { "type": "string", "description": "Shipment tracking number" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Order placement timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Order revision timestamp" }
+      },
+      "required": ["id", "userId", "customerName", "customerPhone", "customerEmail", "address", "city", "state", "zip", "items", "subtotal", "shipping", "total", "status"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Web form customer message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Form message ID" },
+        "name": { "type": "string", "description": "Contact name" },
+        "email": { "type": "string", "format": "email", "description": "Contact email" },
+        "mobile": { "type": "string", "description": "Contact mobile number" },
+        "message": { "type": "string", "description": "Support or inquiry message text" },
+        "responded": { "type": "boolean", "description": "Has followed up state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Submission time" }
+      },
+      "required": ["name", "email", "mobile", "message", "responded"]
+    },
+    "EmailLog": {
+      "title": "EmailLog",
+      "description": "Triggered customer and helper notification emails",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Log ID" },
+        "recipient": { "type": "string", "description": "Recipient email" },
+        "subject": { "type": "string", "description": "Email header" },
+        "content": { "type": "string", "description": "Email body content text or HTML" },
+        "sentAt": { "type": "string", "format": "date-time", "description": "Timestamp of sending" }
+      },
+      "required": ["recipient", "subject", "content", "sentAt"]
+    },
+    "Brand": {
+      "title": "Brand",
+      "description": "Supported computer repair manufacturer brands for slide selection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique brand identifier" },
+        "name": { "type": "string", "description": "Name of the partner manufacturer or brand" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Log creation time" }
+      },
+      "required": ["name", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Profiles and permissions for clients and administrators"
+    },
+    "products": {
+      "schema": "Product",
+      "description": "Inventory hardware, parts, and computer accessories"
+    },
+    "tickets": {
+      "schema": "Ticket",
+      "description": "Support tickets raised by customers"
+    },
+    "orders": {
+      "schema": "Order",
+      "description": "Sales orders and physical delivery states"
+    },
+    "contacts": {
+      "schema": "Contact",
+      "description": "Information desk contact form logs"
+    },
+    "email_logs": {
+      "schema": "EmailLog",
+      "description": "Simulated and real order/repair update emails"
+    },
+    "brands": {
+      "schema": "Brand",
+      "description": "Dynamic brands list for home page non-stop slide animation marquee"
+    }
+  }
+}
