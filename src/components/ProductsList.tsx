@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { ProductItem, OperationType } from "../types";
-import { Search, SlidersHorizontal, AlertCircle } from "lucide-react";
+import { Search, SlidersHorizontal, AlertCircle, X } from "lucide-react";
 import { useNotifications } from "./NotificationsContext";
 import { ProductCard } from "./ProductCard";
 
@@ -84,10 +84,17 @@ export const ProductsList: React.FC<ProductsListProps> = ({ onAddToCart, onBuyNo
       
       {/* Search and control drawers */}
       <div className="bg-white border border-gray-100 rounded-3xl p-5 sm:p-7 space-y-6 text-left">
-        <h2 className="text-xl font-bold font-sans text-gray-900 flex items-center gap-2">
-          <SlidersHorizontal className="h-5 w-5 text-teal-500" />
-          Filter Accessories & Spares
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h2 className="text-xl font-bold font-sans text-gray-900 flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5 text-teal-500" />
+            Filter Accessories & Spares
+          </h2>
+          {!loading && (
+            <span className="text-xs font-mono bg-teal-50 text-teal-700 px-3 py-1.5 rounded-full font-bold">
+              {filteredProducts.length} {filteredProducts.length === 1 ? "Component" : "Components"} Found
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2 relative">
@@ -97,15 +104,24 @@ export const ProductsList: React.FC<ProductsListProps> = ({ onAddToCart, onBuyNo
               placeholder="Search components, brand name, category..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 pl-10.5 pr-4.5 py-3 text-gray-800 focus:bg-white"
+              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 pl-10.5 pr-10.5 py-3 text-gray-800 focus:bg-white transition-all duration-150 focus:border-teal-400 focus:outline-none"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-3 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-150 transition-colors focus:outline-none"
+                title="Clear Search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           <div>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-gray-500 focus:bg-white cursor-pointer"
+              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-gray-600 focus:bg-white focus:border-teal-400 focus:outline-none cursor-pointer"
             >
               <option disabled>Filter Category</option>
               {CATEGORIES.map((cat) => (
@@ -118,7 +134,7 @@ export const ProductsList: React.FC<ProductsListProps> = ({ onAddToCart, onBuyNo
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as any)}
-              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-gray-500 focus:bg-white cursor-pointer"
+              className="w-full text-sm rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3 text-gray-600 focus:bg-white focus:border-teal-400 focus:outline-none cursor-pointer"
             >
               <option disabled>Order Sorting</option>
               <option value="featured">Featured Spares</option>
@@ -127,6 +143,27 @@ export const ProductsList: React.FC<ProductsListProps> = ({ onAddToCart, onBuyNo
               <option value="stock">In Stock First</option>
             </select>
           </div>
+        </div>
+
+        {/* Quick select category badges pills */}
+        <div className="pt-2 border-t border-gray-50 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mr-2">Quick Filter:</span>
+          {CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`text-xs px-3.5 py-1.5 rounded-full font-semibold transition-all duration-150 cursor-pointer focus:outline-none ${
+                  isActive
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-100"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
       </div>
 

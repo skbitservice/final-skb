@@ -111,7 +111,7 @@ export const AboutContact: React.FC = () => {
               <Mail className="h-5 w-5 text-teal-500 flex-shrink-0" />
               <div>
                 <header className="text-xs font-mono font-bold uppercase text-teal-600">Administrative Email</header>
-                <a href="mailto:support@skbcomputerservices.in" className="text-sm text-gray-700 hover:text-teal-600">support@skbcomputerservices.in</a>
+                <a href="mailto:skbitservice@gmail.com" className="text-sm text-gray-700 hover:text-teal-600">skbitservice@gmail.com</a>
               </div>
             </div>
 
@@ -119,15 +119,15 @@ export const AboutContact: React.FC = () => {
               <Phone className="h-5 w-5 text-teal-500 flex-shrink-0" />
               <div>
                 <header className="text-xs font-mono font-bold uppercase text-teal-600">Hotline Phone</header>
-                <a href="tel:+919876543210" className="text-sm text-gray-700 hover:text-teal-600">+91 98765 43210</a>
+                <a href="tel:+917011396007" className="text-sm text-gray-700 hover:text-teal-600">+91 7011396007</a>
               </div>
             </div>
 
             <div className="flex gap-4 p-4 border border-gray-50 rounded-2xl bg-white/70">
               <MapPin className="h-5 w-5 text-teal-500 flex-shrink-0" />
               <div>
-                <header className="text-xs font-mono font-bold uppercase text-teal-600">Delhi Desk</header>
-                <span className="text-sm text-gray-800">123 Premium Plaza, MG Road, New Delhi</span>
+                <header className="text-xs font-mono font-bold uppercase text-teal-600">Delhi Desks</header>
+                <span className="text-sm text-gray-800 leading-relaxed font-semibold">Nehru Place / Nangloi / Janakpuri, New Delhi</span>
               </div>
             </div>
           </div>
@@ -168,7 +168,7 @@ export const AboutContact: React.FC = () => {
               <span className="text-xs font-semibold text-gray-600 pl-1">Mobile Contact Number *</span>
               <input
                 type="tel"
-                placeholder="e.g. +91 98765 43210"
+                placeholder="e.g. +91 70113 96007"
                 required
                 value={formData.mobile}
                 onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}

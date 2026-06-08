@@ -1,12 +1,26 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { initializeFirestore, doc, getDocFromServer } from "firebase/firestore";
 import { OperationType, FirestoreErrorInfo } from "./types";
 import firebaseConfig from "../firebase-applet-config.json";
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const config = firebaseConfig as any;
+const app = initializeApp(config);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, config.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// In-memory token caching for Workspace integrations
+let cachedAccessToken: string | null = null;
+
+export const setCachedAccessToken = (token: string | null) => {
+  cachedAccessToken = token;
+};
+
+export const getCachedAccessToken = (): string | null => {
+  return cachedAccessToken;
+};
 
 // Critical constraint: Validation of Firestore connection on startup
 async function testConnection() {

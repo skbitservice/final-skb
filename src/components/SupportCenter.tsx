@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError } from "../firebase";
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { OperationType, SupportTicket } from "../types";
-import { ArrowUpRight, HelpCircle, Ticket, Compass, Lock, Search, FileText } from "lucide-react";
+import { ArrowUpRight, HelpCircle, Ticket, Compass, Lock, Search, FileText, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 
 interface SupportCenterProps {
   user: { email: string; name: string; role: "customer" | "admin" } | null;
@@ -22,6 +22,103 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
   const [loading, setLoading] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
 
+  // Web Speech API Integration
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  const isSpeechSupported = !!SpeechRecognition;
+  const [isListening, setIsListening] = useState(false);
+  const [recognitionInstance, setRecognitionInstance] = useState<any>(null);
+
+  const toggleListening = () => {
+    if (!isSpeechSupported) return;
+
+    if (isListening) {
+      if (recognitionInstance) {
+        recognitionInstance.stop();
+      }
+      setIsListening(false);
+    } else {
+      try {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.lang = "en-US";
+
+        rec.onstart = () => {
+          setIsListening(true);
+        };
+
+        rec.onresult = (event: any) => {
+          const resultIndex = event.resultIndex;
+          const transcript = event.results[resultIndex][0].transcript;
+          if (transcript) {
+            setFormData((prev) => ({
+              ...prev,
+              message: prev.message ? `${prev.message.trim()} ${transcript.trim()}` : transcript.trim(),
+            }));
+          }
+        };
+
+        rec.onerror = (event: any) => {
+          console.error("Speech recognition error:", event.error);
+          setIsListening(false);
+        };
+
+        rec.onend = () => {
+          setIsListening(false);
+        };
+
+        rec.start();
+        setRecognitionInstance(rec);
+      } catch (err) {
+        console.error("Speech recognition initiation failed:", err);
+        setIsListening(false);
+      }
+    }
+  };
+
+  // Text-To-Speech Playback Implementation
+  const [isPlayingBack, setIsPlayingBack] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handlePlayback = () => {
+    if (!window.speechSynthesis) {
+      alert("Text-to-speech audio feedback is not supported in this browser.");
+      return;
+    }
+
+    if (isPlayingBack) {
+      window.speechSynthesis.cancel();
+      setIsPlayingBack(false);
+    } else {
+      if (!formData.message.trim()) {
+        alert("Please describe your laptop issue (either by typing or dictating) first before verifying!");
+        return;
+      }
+
+      // Stop any other active speech
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(formData.message);
+      utterance.onend = () => {
+        setIsPlayingBack(false);
+      };
+      utterance.onerror = (e) => {
+        console.error("Speech synthesis playback error:", e);
+        setIsPlayingBack(false);
+      };
+
+      setIsPlayingBack(true);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   // Tracker state
   const [trackId, setTrackId] = useState("");
   const [trackEmail, setTrackEmail] = useState("");
@@ -31,6 +128,11 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsPlayingBack(false);
+    }
 
     const customerName = user ? user.name : formData.name;
     const customerEmail = user ? user.email : formData.email;
@@ -200,17 +302,80 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
             />
           </label>
 
-          <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-gray-600 pl-1">Detailed problem description *</span>
-            <textarea
-              rows={4}
-              placeholder="Describe what occurs, when it began, and specific symptoms..."
-              required
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              className="w-full text-sm rounded-xl border border-gray-100 px-4 py-3 text-gray-800 bg-gray-50/50 focus:bg-white transition-all focus:outline-none"
-            />
-          </label>
+          <div className="block space-y-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1 gap-2">
+              <span className="text-xs font-semibold text-gray-600 pl-1">Detailed problem description *</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {isSpeechSupported ? (
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      isListening
+                        ? "bg-red-500 hover:bg-red-600 text-white shadow-sm ring-2 ring-red-200"
+                        : "bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-100/50"
+                    }`}
+                    title={isListening ? "Stop voice dictation" : "Dictate issue with voice"}
+                  >
+                    {isListening ? (
+                      <>
+                        <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping mr-1" />
+                        <MicOff className="h-3.5 w-3.5" />
+                        <span>Stop Listening</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-3.5 w-3.5 text-teal-600" />
+                        <span>Dictate Issue</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-mono text-gray-400 italic">Voice input unsupported</span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handlePlayback}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    isPlayingBack
+                      ? "bg-amber-500 hover:bg-amber-600 text-white shadow-sm ring-2 ring-amber-200"
+                      : "bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-100/50"
+                  }`}
+                  title={isPlayingBack ? "Stop listening to transcription" : "Listen and verify transcription"}
+                >
+                  {isPlayingBack ? (
+                    <>
+                      <VolumeX className="h-3.5 w-3.5" />
+                      <span>Stop Playback</span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-3.5 w-3.5 text-teal-600" />
+                      <span>Verify Text (Listen)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            <div className="relative">
+              <textarea
+                rows={4}
+                placeholder="Describe what occurs, when it began, and specific symptoms... (You can click 'Dictate Issue' to speak directly to this field!)"
+                required
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                className="w-full text-sm rounded-xl border border-gray-100 px-4 py-3 text-gray-800 bg-gray-50/50 focus:bg-white transition-all focus:outline-none focus:border-teal-400"
+              />
+              {isListening && (
+                <div className="absolute right-3.5 bottom-3.5 flex items-center gap-1.5 bg-red-50 text-red-700 px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono border border-red-200 animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-bounce" />
+                  Voice Active: Speak Clearly
+                </div>
+              )}
+            </div>
+          </div>
 
           {successId && (
             <div className="p-4 rounded-xl bg-teal-50 border border-teal-150 text-teal-800 text-xs">

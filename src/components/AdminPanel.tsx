@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { db, handleFirestoreError } from "../firebase";
+import { auth, db, handleFirestoreError, getCachedAccessToken, setCachedAccessToken } from "../firebase";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { ProductItem, SupportTicket, SupportContact, PurchaseOrder, UserProfile, OperationType, BrandItem } from "../types";
-import { PlusCircle, Trash, Send, CheckSquare, Users, ShoppingCart, Loader2, RefreshCw, Layers } from "lucide-react";
+import { PlusCircle, Trash, Send, CheckSquare, Users, ShoppingCart, Loader2, RefreshCw, Layers, Mail, Inbox, AlertCircle, CheckCircle2, ExternalLink, Lock } from "lucide-react";
+import { GmailDesk } from "./GmailDesk";
 
 export const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"products" | "tickets" | "orders" | "contacts" | "users" | "brands">("tickets");
+  const [activeTab, setActiveTab] = useState<"products" | "tickets" | "orders" | "contacts" | "users" | "brands" | "gmail">("tickets");
   
   // Database states
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -257,30 +259,80 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-  // Base64 image reader for local uploads supporting multi-files
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressProductImage = (rawBase64: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(rawBase64);
+          return;
+        }
+
+        const maxDim = 700;
+        let width = img.width;
+        let height = img.height;
+
+        // Maintain aspect ratio
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL("image/jpeg", 0.75);
+        resolve(compressed);
+      };
+      img.onerror = () => {
+        resolve(rawBase64);
+      };
+      img.src = rawBase64;
+    });
+  };
+
+  // Base64 image reader for local uploads supporting multi-files with integrated compression
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const loadedImages: string[] = [];
-      let loadedCount = 0;
+      setUploading(true);
+      try {
+        const compressPromises = (Array.from(files) as File[]).map((file) => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (typeof event.target?.result === "string") {
+                compressProductImage(event.target.result).then(resolve);
+              } else {
+                resolve("");
+              }
+            };
+            reader.onerror = () => resolve("");
+            reader.readAsDataURL(file);
+          });
+        });
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            loadedImages.push(event.target.result as string);
-          }
-          loadedCount++;
-          if (loadedCount === files.length) {
-            setNewProduct((prev) => ({
-              ...prev,
-              image: loadedImages[0] || "",
-              images: loadedImages,
-            }));
-          }
-        };
-        reader.readAsDataURL(file);
+        const compressedImages = (await Promise.all(compressPromises)).filter(Boolean);
+        
+        if (compressedImages.length > 0) {
+          setNewProduct((prev) => ({
+            ...prev,
+            image: compressedImages[0],
+            images: compressedImages,
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to compress images", err);
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -321,6 +373,7 @@ export const AdminPanel: React.FC = () => {
           { id: "contacts", label: "Contact Inquiries" },
           { id: "users", label: "Admin Profiles" },
           { id: "brands", label: "Manage Brands" },
+          { id: "gmail", label: "Gmail Desk ✉️" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -722,6 +775,11 @@ export const AdminPanel: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Gmail Support Workspace */}
+        {activeTab === "gmail" && (
+          <GmailDesk />
         )}
 
       </div>

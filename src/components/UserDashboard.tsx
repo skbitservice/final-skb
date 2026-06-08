@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth, db, handleFirestoreError } from "../firebase";
 import { collection, query, where, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { PurchaseOrder, SupportTicket, OperationType } from "../types";
-import { User, NotebookTabs, ShoppingBag, Eye, Save, Key, AlertCircle, CheckCircle2 } from "lucide-react";
+import { User, NotebookTabs, ShoppingBag, Eye, Save, Key, AlertCircle, CheckCircle2, Camera, Upload, Trash2, Video, VideoOff, RefreshCw, X, FolderOpen } from "lucide-react";
 
 interface UserDashboardProps {
-  user: { email: string; name: string; role: "customer" | "admin" } | null;
-  onRefreshUser: (name: string) => void;
+  user: { email: string; name: string; role: "customer" | "admin"; photoURL?: string } | null;
+  onRefreshUser: (name: string, photoURL?: string) => void;
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ user, onRefreshUser }) => {
@@ -17,12 +17,34 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ user, onRefreshUse
   const [myOrders, setMyOrders] = useState<PurchaseOrder[]>([]);
   const [profileData, setProfileData] = useState({
     name: user?.name || "",
-    mobile: "9876543210",
-    address: "MG Road, New Delhi",
+    mobile: "7011396007",
+    address: "Nehru Place, New Delhi",
   });
   
   const [editLoading, setEditLoading] = useState(false);
   const [editSuccess, setEditSuccess] = useState(false);
+
+  // Profile image upload states
+  const [photoSource, setPhotoSource] = useState<"none" | "camera" | "upload">("none");
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Refs for tracking camera stream and file inputs
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Automatically shut down live camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -65,8 +87,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ user, onRefreshUse
           const dbUser = snap.data();
           setProfileData({
             name: dbUser.name || user.name,
-            mobile: dbUser.mobile || "9876543210",
-            address: dbUser.address || "123 Premium Plaza, New Delhi",
+            mobile: dbUser.mobile || "7011396007",
+            address: dbUser.address || "Nehru Place, New Delhi",
           });
         }
       },
@@ -105,6 +127,148 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ user, onRefreshUse
       setEditSuccess(true);
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  // PROFILE PHOTO UTILTIES & CORE ENGINE METHODS
+  const startCamera = async () => {
+    setCameraError("");
+    setPreviewPhoto(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 320, facingMode: "user" }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+    } catch (err: any) {
+      console.error("Camera access failed", err);
+      setCameraError("Camera access disabled or denied in this sandbox. Please use storage browser instead!");
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    
+    const canvas = document.createElement("canvas");
+    const size = 250;
+    canvas.width = size;
+    canvas.height = size;
+    
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      const minDim = Math.min(video.videoWidth, video.videoHeight);
+      const sx = (video.videoWidth - minDim) / 2;
+      const sy = (video.videoHeight - minDim) / 2;
+      ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, size, size);
+      const b64 = canvas.toDataURL("image/jpeg", 0.85);
+      setPreviewPhoto(b64);
+      stopCamera();
+    }
+  };
+
+  const compressAndSetPhoto = (rawBase64: string) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const size = 250;
+      canvas.width = size;
+      canvas.height = size;
+      if (ctx) {
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        setPreviewPhoto(compressed);
+      }
+    };
+    img.src = rawBase64;
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          compressAndSetPhoto(reader.result);
+        }
+      };
+      reader.readAsDataURL(files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files[0] && files[0].type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          compressAndSetPhoto(reader.result);
+        }
+      };
+      reader.readAsDataURL(files[0]);
+    }
+  };
+
+  const saveProfilePhoto = async () => {
+    if (!previewPhoto || !auth.currentUser) return;
+    setUploadLoading(true);
+    try {
+      const userDocRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(userDocRef, {
+        photoURL: previewPhoto,
+      });
+      onRefreshUser(profileData.name, previewPhoto);
+      setPhotoSource("none");
+      setPreviewPhoto(null);
+    } catch (err) {
+      console.error("Failed to save profile picture.", err);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const deleteProfilePhoto = async () => {
+    if (!confirm("Are you sure you want to revert your profile back to default?")) return;
+    if (!auth.currentUser) return;
+    setUploadLoading(true);
+    try {
+      const userDocRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(userDocRef, {
+        photoURL: "",
+      });
+      onRefreshUser(profileData.name, "");
+      setPreviewPhoto(null);
+      setPhotoSource("none");
+    } catch (err) {
+      console.error("Failed to delete profile picture.", err);
+    } finally {
+      setUploadLoading(false);
     }
   };
 
@@ -231,14 +395,207 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ user, onRefreshUse
               </form>
             </div>
 
-            <div className="md:col-span-4 bg-teal-50/25 border border-teal-100/60 rounded-3xl p-6.5 space-y-4">
-              <h4 className="font-mono text-xs uppercase tracking-wider text-teal-600 font-bold">Workspace Status</h4>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Your profile registers your default shipping locations and phone keys for laptop delivery invoices and support logs.
-              </p>
-              <div className="p-4 rounded-xl bg-white/80 border border-teal-50 space-y-2 text-xs text-gray-600">
-                <p><strong>Account Role:</strong> {user?.role === "admin" ? "Systems Administrator" : "Verified Customer"}</p>
-                <p><strong>Database ID:</strong> <span className="font-mono font-bold text-gray-500">USR-{user?.email.split("@")[0].toUpperCase()}</span></p>
+            <div className="md:col-span-4 space-y-6">
+              {/* Profile Photo Card */}
+              <div className="bg-white border border-gray-100 rounded-3xl p-6.5 text-center space-y-4.5">
+                <header className="text-left">
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-teal-600 font-bold">Profile Identity</span>
+                  <h4 className="text-sm font-bold text-gray-800">Member Avatar Image</h4>
+                </header>
+
+                {/* Avatar circle frame */}
+                <div className="relative w-30 h-30 mx-auto">
+                  {previewPhoto ? (
+                    <img
+                      src={previewPhoto}
+                      alt="Crop Preview"
+                      className="w-full h-full rounded-full object-cover border-4 border-teal-500 shadow-md animate-pulse"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : user?.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.name}
+                      className="w-full h-full rounded-full object-cover border-4 border-teal-500 shadow-md"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-teal-100/60 text-teal-700 flex items-center justify-center font-extrabold text-3xl border-4 border-teal-50 border-double">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+                    </div>
+                  )}
+
+                  {previewPhoto && (
+                    <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white font-mono text-[9px] uppercase px-1.8 py-0.5 rounded-full font-bold shadow-xs">
+                      Preview
+                    </span>
+                  )}
+                </div>
+
+                {/* Main controls */}
+                {photoSource === "none" && !previewPhoto && (
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] text-gray-400">
+                      Update your account photo using your web camera or drag-and-drop local storage file.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setPhotoSource("camera");
+                          startCamera();
+                        }}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl border border-teal-100 bg-teal-50/40 text-teal-700 hover:bg-teal-50 text-xs font-bold transition-all cursor-pointer focus:outline-none"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Live Cam
+                      </button>
+
+                      <button
+                        onClick={() => setPhotoSource("upload")}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 text-gray-700 hover:bg-gray-100 text-xs font-bold transition-all cursor-pointer focus:outline-none"
+                      >
+                        <FolderOpen className="h-3.5 w-3.5" />
+                        Browse
+                      </button>
+                    </div>
+
+                    {user?.photoURL && (
+                      <button
+                        onClick={deleteProfilePhoto}
+                        disabled={uploadLoading}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-red-500 hover:text-red-700 mx-auto pt-1 cursor-pointer focus:outline-none disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Remove photo
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Live camera feed stream */}
+                {photoSource === "camera" && (
+                  <div className="space-y-3 p-1.5 border border-teal-50 bg-teal-50/15 rounded-2xl animate-fade-up">
+                    <span className="block font-mono text-[9px] uppercase text-teal-600 font-bold">Webcam Device Active</span>
+                    
+                    <div className="relative bg-gray-900 rounded-xl overflow-hidden aspect-square w-full max-w-[200px] mx-auto border-2 border-teal-500/20">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover scale-x-[-1]"
+                      />
+                      {!cameraActive && !cameraError && (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-teal-400 font-semibold bg-gray-900/90 font-mono">
+                          Activating device...
+                        </div>
+                      )}
+                      {cameraError && (
+                        <div className="absolute inset-0 flex items-center justify-center p-3 text-center text-[10px] text-red-400 font-semibold bg-gray-900/95 font-sans leading-relaxed">
+                          {cameraError}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-center gap-2">
+                      <button
+                        onClick={capturePhoto}
+                        disabled={!cameraActive}
+                        className="inline-flex items-center gap-1 px-3.5 py-1.8 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer focus:outline-none disabled:opacity-50"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Take Snapshot
+                      </button>
+                      <button
+                        onClick={() => {
+                          stopCamera();
+                          setPhotoSource("none");
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.8 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold cursor-pointer focus:outline-none"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Local storage picker Drag and drop upload zone */}
+                {photoSource === "upload" && (
+                  <div className="space-y-3.5 animate-fade-up animate-duration-250">
+                    <span className="block font-mono text-[9px] uppercase text-gray-500 font-bold">Pick Local Image</span>
+                    
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6.5 text-center cursor-pointer transition-all ${
+                        isDragOver
+                          ? "border-teal-500 bg-teal-50/40 scale-[0.98]"
+                          : "border-gray-200 bg-gray-50/50 hover:bg-gray-50/90 hover:border-teal-400"
+                      }`}
+                    >
+                      <Upload className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                      <strong className="block text-xs font-bold text-gray-700">Drag or drop profile photo</strong>
+                      <span className="text-[10px] text-gray-400 block mt-1">or click to browse local files</span>
+                      
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setPhotoSource("none")}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel Upload
+                    </button>
+                  </div>
+                )}
+
+                {/* Image preview actions */}
+                {previewPhoto && (
+                  <div className="space-y-2 border-t border-gray-50 pt-3 animate-fade-up">
+                    <p className="text-[10px] text-teal-600 font-semibold">New Profile Image Selected!</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={saveProfilePhoto}
+                        disabled={uploadLoading}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer focus:outline-none disabled:opacity-50"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        {uploadLoading ? "Saving..." : "Save Image"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPreviewPhoto(null);
+                          setPhotoSource("none");
+                        }}
+                        disabled={uploadLoading}
+                        className="inline-flex items-center justify-center gap-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer focus:outline-none disabled:opacity-50"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Workspace Status Info */}
+              <div className="bg-teal-50/25 border border-teal-100/60 rounded-3xl p-6.5 space-y-4 text-left">
+                <h4 className="font-mono text-xs uppercase tracking-wider text-teal-600 font-bold">Workspace Status</h4>
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Your profile registers your default shipping locations and phone keys for laptop delivery invoices and support logs.
+                </p>
+                <div className="p-4 rounded-xl bg-white/80 border border-teal-50 space-y-2 text-xs text-gray-600">
+                  <p><strong>Account Role:</strong> {user?.role === "admin" ? "Systems Administrator" : "Verified Customer"}</p>
+                  <p><strong>Database ID:</strong> <span className="font-mono font-bold text-gray-500">USR-{user?.email ? user.email.split("@")[0].toUpperCase() : "VERIFIED"}</span></p>
+                </div>
               </div>
             </div>
           </div>

@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { ShoppingCart, User, LogOut, ShieldAlert, Monitor, Menu, X, Bell } from "lucide-react";
+import { ShoppingCart, User, LogOut, ShieldAlert, Monitor, Menu, X, Bell, Sun, Moon } from "lucide-react";
 import { useNotifications } from "./NotificationsContext";
 
 interface HeaderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   cartCount: number;
-  user: { email: string; name: string; role: "customer" | "admin" } | null;
+  user: { email: string; name: string; role: "customer" | "admin"; photoURL?: string } | null;
   onLogout: () => void;
+  theme: "light" | "dark-surface";
+  onThemeToggle: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   cartCount,
   user,
   onLogout,
+  theme,
+  onThemeToggle,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -29,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-gray-100 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-[100] w-full border-b border-gray-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md transition-all duration-300">
       <div className="mx-auto flex max-w-7xl h-20 items-center justify-between px-4 sm:px-6">
         
         {/* Logo and Brand */}
@@ -84,6 +88,20 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           
+          {/* Global Theme Toggle Button */}
+          <button
+            onClick={onThemeToggle}
+            className="p-2.5 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-slate-800 dark:hover:text-white transition-all cursor-pointer focus:outline-none flex items-center justify-center border border-gray-100/40 dark:border-slate-800/40"
+            title={theme === "light" ? "Switch to Dark Surface Mode" : "Switch to Light Mode"}
+            id="theme-toggle-btn"
+          >
+            {theme === "light" ? (
+              <Moon className="h-5 w-5 text-gray-500" />
+            ) : (
+              <Sun className="h-5 w-5 text-amber-400" />
+            )}
+          </button>
+
           {/* Push Notifications Hub */}
           <div className="relative">
             <button
@@ -155,11 +173,15 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setActiveTab("account"); setShowNotifDropdown(false); }}
-                className={`hidden sm:flex items-center gap-1.5 px-3.5 py-1.8 rounded-xl font-medium text-xs border border-gray-100 bg-gray-50/50 hover:bg-gray-100 text-gray-700 transition-all cursor-pointer focus:outline-none ${
+                className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium text-xs border border-gray-100 bg-gray-50/50 hover:bg-gray-100 text-gray-700 transition-all cursor-pointer focus:outline-none ${
                   activeTab === "account" ? "border-teal-300 text-teal-700 bg-teal-50/50" : ""
                 }`}
               >
-                <User className="h-4 w-4 text-teal-500" />
+                {user.photoURL ? (
+                  <img src={user.photoURL} referrerPolicy="no-referrer" alt="Profile" className="h-5 w-5 rounded-full object-cover border border-teal-500 shadow-xs" />
+                ) : (
+                  <User className="h-4 w-4 text-teal-500" />
+                )}
                 Hi, {user.name.split(" ")[0]}
               </button>
               <button
@@ -223,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {user && (
+           {user && (
             <button
               onClick={() => {
                 setActiveTab("account");
@@ -231,7 +253,11 @@ export const Header: React.FC<HeaderProps> = ({
               }}
               className="flex items-center gap-1.5 font-semibold text-sm text-teal-600 py-2.5"
             >
-              <User className="h-4.5 w-4.5" />
+              {user.photoURL ? (
+                <img src={user.photoURL} referrerPolicy="no-referrer" alt="Profile" className="h-5 w-5 rounded-full object-cover border border-teal-500 shadow-xs" />
+              ) : (
+                <User className="h-4.5 w-4.5" />
+              )}
               Member: {user.name}
             </button>
           )}

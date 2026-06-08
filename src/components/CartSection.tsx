@@ -315,7 +315,7 @@ export const CartSection: React.FC<CartSectionProps> = ({
                       <input
                         type="tel"
                         required
-                        placeholder="e.g. +91 98765 43210"
+                        placeholder="e.g. +91 70113 96007"
                         value={addressData.phone}
                         onChange={(e) => setAddressData({ ...addressData, phone: e.target.value })}
                         className="w-full text-xs rounded-xl border border-gray-100 bg-white px-3.5 py-2.5"

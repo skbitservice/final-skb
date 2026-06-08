@@ -6,6 +6,7 @@ export interface UserProfile {
   address: string;
   role: "customer" | "admin";
   status: "Active" | "Blocked";
+  photoURL?: string;
   createdAt: string;
 }
 

@@ -42,7 +42,8 @@ service cloud.firestore {
              data.mobile is string && data.mobile.size() <= 20 &&
              data.address is string && data.address.size() <= 500 &&
              data.role is string && (data.role == "customer" || data.role == "admin") &&
-             data.status is string && (data.status == "Active" || data.status == "Blocked");
+             data.status is string && (data.status == "Active" || data.status == "Blocked") &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 150000));
     }
 
     function isValidProduct(data) {

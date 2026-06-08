@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { auth, db } from "./firebase";
+import { auth, db, setCachedAccessToken } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, query, where, getDocs, doc, onSnapshot, getDoc } from "firebase/firestore";
 import { OrderItem, ProductItem } from "./types";
@@ -30,9 +30,35 @@ const AppContent: React.FC = () => {
     return [];
   });
 
-  const [user, setUser] = useState<{ email: string; name: string; role: "customer" | "admin" } | null>(null);
+  const [user, setUser] = useState<{ email: string; name: string; role: "customer" | "admin"; photoURL?: string } | null>(null);
   const [appReady, setAppReady] = useState(false);
   const { triggerNotification } = useNotifications();
+
+  const [theme, setTheme] = useState<"light" | "dark-surface">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("skb-theme");
+      return (saved as "light" | "dark-surface") || "light";
+    }
+    return "light";
+  });
+
+  // Track and apply theme changes to global document classes
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    if (theme === "dark-surface") {
+      root.classList.add("dark-surface");
+      body.classList.add("dark-surface");
+    } else {
+      root.classList.remove("dark-surface");
+      body.classList.remove("dark-surface");
+    }
+    localStorage.setItem("skb-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark-surface" : "light"));
+  };
 
   // Save cart changes
   useEffect(() => {
@@ -58,6 +84,7 @@ const AppContent: React.FC = () => {
         // Retrieve Firestore users collection for profile metadata details directly
         let userName = firebaseUser.displayName || firebaseUser.email.split("@")[0];
         let dbRole = roleVal;
+        let photoURL = firebaseUser.photoURL || "";
 
         try {
           const userDocRef = doc(db, "users", firebaseUser.uid);
@@ -66,6 +93,7 @@ const AppContent: React.FC = () => {
             const dbData = snap.data();
             userName = dbData.name || userName;
             dbRole = dbData.role || dbRole;
+            photoURL = dbData.photoURL || photoURL;
           }
         } catch (err) {
           console.warn("Using offline fallback profile info.");
@@ -75,6 +103,7 @@ const AppContent: React.FC = () => {
           email: firebaseUser.email,
           name: userName,
           role: dbRole as "customer" | "admin",
+          photoURL: photoURL,
         });
 
         // Set up background snapshot listener on user's active orders
@@ -112,6 +141,7 @@ const AppContent: React.FC = () => {
 
       } else {
         setUser(null);
+        setCachedAccessToken(null);
       }
       setAppReady(true);
     });
@@ -127,6 +157,7 @@ const AppContent: React.FC = () => {
   // Logout operations
   const handleLogout = async () => {
     await signOut(auth);
+    setCachedAccessToken(null);
     setUser(null);
     setActiveTab("home");
     triggerNotification("Session logged out", "You have successfully signed out of SKB Services.");
@@ -198,6 +229,8 @@ const AppContent: React.FC = () => {
         cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
         user={user}
         onLogout={handleLogout}
+        theme={theme}
+        onThemeToggle={toggleTheme}
       />
 
       <main className="flex-grow">
@@ -239,7 +272,7 @@ const AppContent: React.FC = () => {
           user ? (
             <UserDashboard
               user={user}
-              onRefreshUser={(name) => setUser((p) => p ? { ...p, name } : null)}
+              onRefreshUser={(name, photoURL) => setUser((p) => p ? { ...p, name, ...(photoURL !== undefined ? { photoURL } : {}) } : null)}
             />
           ) : (
             <AuthInterface

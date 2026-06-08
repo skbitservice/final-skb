@@ -25,15 +25,15 @@ export const Footer: React.FC = () => {
           <ul className="space-y-3.5 text-sm text-gray-600">
             <li className="flex items-center gap-2.5">
               <Phone className="h-4 w-4 text-teal-500" />
-              <a href="tel:+919876543210" className="hover:text-teal-600 transition-colors">+91 98765 43210</a>
+              <a href="tel:+917011396007" className="hover:text-teal-600 transition-colors">+91 7011396007</a>
             </li>
             <li className="flex items-center gap-2.5">
               <Mail className="h-4 w-4 text-teal-500" />
-              <a href="mailto:support@skbcomputerservices.in" className="hover:text-teal-600 transition-colors">support@skbcomputerservices.in</a>
+              <a href="mailto:skbitservice@gmail.com" className="hover:text-teal-600 transition-colors">skbitservice@gmail.com</a>
             </li>
             <li className="flex items-start gap-2.5">
               <MapPin className="h-4 w-4 text-teal-500 mt-0.5" />
-              <span>123 Premium Plaza, MG Road, New Delhi, India</span>
+              <span>Nehru Place / Nangloi / Janakpuri, New Delhi, India</span>
             </li>
           </ul>
         </div>
