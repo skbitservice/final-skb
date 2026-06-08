@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import { db, handleFirestoreError } from "../firebase";
 import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { OperationType, SupportTicket } from "../types";
-import { ArrowUpRight, HelpCircle, Ticket, Compass, Lock, Search, FileText, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { ArrowUpRight, HelpCircle, Ticket, Compass, Lock, Search, FileText, Mic, MicOff, Volume2, VolumeX, Mail, Send, Sparkles, CheckCircle2, X } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { useNotifications } from "./NotificationsContext";
 
 interface SupportCenterProps {
   user: { email: string; name: string; role: "customer" | "admin" } | null;
@@ -10,6 +12,8 @@ interface SupportCenterProps {
 }
 
 export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateToDashboard }) => {
+  const { triggerNotification } = useNotifications();
+
   // Raised state
   const [formData, setFormData] = useState({
     subject: "",
@@ -21,6 +25,51 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
   });
   const [loading, setLoading] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
+
+  // Email Toast state
+  const [emailToast, setEmailToast] = useState<{ id: string; email: string; subject: string } | null>(null);
+
+  // Auto-dismiss the toast
+  useEffect(() => {
+    if (emailToast) {
+      const timer = setTimeout(() => {
+        setEmailToast(null);
+      }, 7500);
+      return () => clearTimeout(timer);
+    }
+  }, [emailToast]);
+
+  const playEmailSentSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      
+      osc1.type = "sine";
+      osc2.type = "triangle";
+      
+      osc1.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      osc1.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.35); // Sweep
+      
+      osc2.frequency.setValueAtTime(554.37, audioCtx.currentTime); // C#5
+      osc2.frequency.exponentialRampToValueAtTime(1108.73, audioCtx.currentTime + 0.35); // Harmony Sweep
+      
+      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      osc1.start();
+      osc2.start();
+      osc1.stop(audioCtx.currentTime + 0.5);
+      osc2.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      // Audio context blocked/unsupported
+    }
+  };
 
   // Web Speech API Integration
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -166,6 +215,20 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
 
       await addDoc(collection(db, "tickets"), payload);
       setSuccessId(ticketId);
+
+      // Trigger high-fidelity mock email confirmation and beautiful swoosh sound
+      setEmailToast({
+        id: ticketId,
+        email: customerEmail,
+        subject: payload.subject,
+      });
+      playEmailSentSound();
+      triggerNotification(
+        "📧 Confirmation Sent",
+        `Support ticket reference ${ticketId} created. A confirmational email summary has been sent to ${customerEmail}.`,
+        "ticket"
+      );
+
       setFormData({
         subject: "",
         priority: "Normal",
@@ -499,6 +562,58 @@ export const SupportCenter: React.FC<SupportCenterProps> = ({ user, onNavigateTo
         </div>
 
       </div>
+
+      {/* Visual Email Confirmation Toast Overlay */}
+      <AnimatePresence>
+        {emailToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-5 overflow-hidden"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30">
+                <Mail className="h-5 w-5 animate-bounce" />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold tracking-widest text-teal-400 uppercase flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Mail Notification
+                  </span>
+                  <button
+                    onClick={() => setEmailToast(null)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <h4 className="text-sm font-bold mt-1 text-gray-100">
+                  Confirmation Dispatched
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed mt-1.5">
+                  A verification receipt with troubleshooting self-help options for ticket <span className="font-mono text-teal-300 font-extrabold">{emailToast.id}</span> has been dispatched to:
+                  <strong className="block mt-1 font-mono text-xs text-amber-300 truncate">{emailToast.email}</strong>
+                </p>
+                <div className="mt-3.5 flex items-center gap-1.5 text-[10px] text-teal-400 font-semibold font-mono bg-teal-500/10 py-1.5 px-2.5 rounded-lg border border-teal-500/20 w-fit">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Sent via SKB Mail Gate
+                </div>
+              </div>
+            </div>
+
+            {/* Timed countdown accent bar */}
+            <motion.div
+              initial={{ width: "100%" }}
+              animate={{ width: "0%" }}
+              transition={{ duration: 7.5, ease: "linear" }}
+              className="absolute bottom-0 left-0 h-1 bg-teal-400"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </section>
   );
